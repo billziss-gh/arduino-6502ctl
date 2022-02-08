@@ -234,16 +234,22 @@ void setup()
     reset();
 
     Serial.begin(1000000);
-    Serial.println("6502ctl: s to step, c to continue, b to break, r to reset");
+    Serial.println();
+    Serial.println("6502ctl:");
+    Serial.println("    s to step");
+    Serial.println("    c to continue");
+    Serial.println("    b to break");
+    Serial.println("    r to reset");
 }
 
+size_t disasm(uint8_t (*read_data)(uint16_t), uint16_t addr, char buf[16]);
 void loop()
 {
     static bool step = 1;
     uint16_t addr;
     uint8_t data;
     uint8_t rwb, sync, mlb, vpb;
-    char buf[64];
+    char serbuf[64], disbuf[16];
     int c;
 
     while (step || Serial.available())
@@ -290,13 +296,17 @@ void loop()
 
     clock_fall();
 
-    snprintf(buf, sizeof buf, "%c %04x %02x%s%s%s",
+    if (sync)
+        disasm(read_data, addr, disbuf);
+
+    snprintf(serbuf, sizeof serbuf, "%c%c%c%c %04x %02x%s%s",
         rwb ? 'r' : 'W',
+        sync ? 'S' : '-',
+        mlb ? '-' : 'M',
+        vpb ? '-' : 'V',
         addr,
         data,
-        sync ? " SYNC" : "",
-        mlb ? "" : " MLB",
-        vpb ? "" : " VPB");
-
-    Serial.println(buf);
+        sync ? " " : "",
+        sync ? disbuf : "");
+    Serial.println(serbuf);
 }
