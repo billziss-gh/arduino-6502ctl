@@ -16,9 +16,9 @@ def value(arg):
         if arg.startswith("$"):
             return int(arg[1:], 16)
         else:
-            return int(arg[1:], 10)
+            return int(arg, 10)
     except:
-        raise SyntaxError("invalid value: %s" % arg)
+        raise SyntaxError("invalid value: %r" % arg)
 
 def mode(arg):
     if not arg:
@@ -41,7 +41,7 @@ def mode(arg):
             v = value(a)
             return "(zp),y", v
         else:
-            raise SyntaxError("invalid operand: %s", arg)
+            raise SyntaxError("invalid operand: %r", arg)
     else:
         if arg.endswith(",X"):
             a = arg[:-2]
@@ -85,7 +85,7 @@ def directive(dir, arg):
         addr += 2
         maxaddr = max(maxaddr, addr - 1)
     else:
-        raise SyntaxError("invalid directive: %s" % dir)
+        raise SyntaxError("invalid directive: %r" % dir)
 
 def assemble(f):
     global line, minaddr, maxaddr, addr, text
@@ -121,7 +121,7 @@ def assemble(f):
             addr += ins[1]
             maxaddr = max(maxaddr, addr - 1)
         else:
-            raise SyntaxError("invalid instruction: %s" % l)
+            raise SyntaxError("invalid instruction: %r" % l)
 
 def emit():
     global minaddr, maxaddr, text

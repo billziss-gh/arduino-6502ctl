@@ -202,7 +202,7 @@ static void reset()
 static uint8_t ram[RAMSIZE];
 static const uint8_t rom[ROMSIZE] PROGMEM =
 {
-#include "6502rom.h"
+    #include "6502rom.h"
 };
 static uint8_t read_data(uint16_t addr)
 {
