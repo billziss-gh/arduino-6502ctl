@@ -121,7 +121,7 @@ struct ins
         MOD_IMM = 0x72,                 /* Immediate Addressing # */
         MOD_IMP = 0x81,                 /* Implied i */
         MOD_PCR = 0x92,                 /* Program Counter Relative r */
-        MOD_STK = 0xa0,                 /* Stack s */
+        MOD_STK = 0xa1,                 /* Stack s */
         MOD_ZPG = 0xb2,                 /* Zero Page zp */
         MOD_ZPG_IND_X = 0xc2,           /* Zero Page Indexed Indirect (zp,x) */
         MOD_ZPG_X = 0xd2,               /* Zero Page Indexed with X zp,x */
