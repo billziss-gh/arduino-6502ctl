@@ -83,20 +83,24 @@ def mode(arg):
             return ("zp" if zpg else "a"), v
 
 def directive(dir, arg):
-    global minaddr, maxaddr, addr, text
+    global minaddr, maxaddr, addr, text, fixup
     if ".ORG" == dir:
         addr = value(arg)
         minaddr = min(minaddr, addr)
         maxaddr = max(maxaddr, addr)
     elif ".BYTE" == dir:
         minaddr = min(minaddr, addr)
-        val = value(arg)
+        val = avalue(arg)
+        if 0x10000 == val:
+            addfixup(fixup, addr - 1, 2)
         text[addr] = val & 0xff
         addr += 1
         maxaddr = max(maxaddr, addr - 1)
     elif ".WORD" == dir:
         minaddr = min(minaddr, addr)
-        val = value(arg)
+        val = avalue(arg)
+        if 0x10000 == val:
+            addfixup(fixup, addr - 1, 3)
         text[addr + 0] = val & 0xff
         text[addr + 1] = (val >> 8) & 0xff
         addr += 2
@@ -105,7 +109,7 @@ def directive(dir, arg):
         raise SyntaxError("invalid directive: %r" % dir)
 
 def assemble(f):
-    global line, minaddr, maxaddr, addr, text
+    global line, minaddr, maxaddr, addr, text, fixup
     line = 0
     for l in f:
         line += 1
@@ -134,7 +138,6 @@ def assemble(f):
             minaddr = min(minaddr, addr)
             text[addr] = ins[0]
             if 0x10000 == val:
-                global fixup
                 addfixup(fixup, addr, ins[1] if "r" != mod else -ins[1])
             if 2 == ins[1]:
                 text[addr + 1] = val & 0xff

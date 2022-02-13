@@ -199,7 +199,7 @@
     "TYA",
     "WAI",
 #elif defined(DISTAB_INS)
-    [0x00] = { ins::MNE_BRK, ins::MOD_STK },                    /* BRK s */
+    [0x00] = { ins::MNE_BRK, ins::MOD_IMM },                    /* BRK # */
     [0x01] = { ins::MNE_ORA, ins::MOD_ZPG_IND_X },              /* ORA (zp,x) */
     [0x02] = { ins::MNE_INVL, ins::MOD_INV },                   /* invalid */
     [0x03] = { ins::MNE_INVL, ins::MOD_INV },                   /* invalid */
