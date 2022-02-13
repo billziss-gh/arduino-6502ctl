@@ -47,7 +47,7 @@ with open("6502distab.h", "wb") as file:
         file.write(b"    %-60s%s\n" % (defn, cmnt))
     file.write(b"#endif\n")
 
-with open("6502astab.py", "wb") as file:
+with open("6502asmtab.py", "wb") as file:
     file.write(b"insmap = {\n")
     for i in ilst:
         if b"INVL" == i[1]:
