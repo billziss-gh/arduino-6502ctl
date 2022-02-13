@@ -1,4 +1,4 @@
-    ; hello.as: 6502 hello world
+    ; hello.asm: 6502 hello world
 
     .def ind0 $fe   ; zero page indirect helper lo
     .def ind1 $ff   ; zero page indirect helper hi
@@ -8,7 +8,7 @@
 entry:
     LDA #$ff
     TAX
-    TXS             ; S = #$ff ; top of stack
+    TXS             ; S = #$ff: top of stack
     LDA #0          ; A = #0
     TAX             ; X = #0
     TAY             ; Y = #0
