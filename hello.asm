@@ -1,5 +1,8 @@
     ; hello.as: 6502 hello world
 
+    .def ind0 $fe   ; zero page indirect helper lo
+    .def ind1 $ff   ; zero page indirect helper hi
+
     .org $c000
 
 entry:
@@ -21,7 +24,7 @@ irq:
     PHY
 
     TSX
-    LDA $04,X       ; fetch P
+    LDA $104,X      ; fetch P
     BIT #$10        ; test B bit
     BNE brk
 
@@ -33,7 +36,14 @@ irq_main:
     RTI
 
 brk:
-    LDA ($05,X)     ; fetch BRK
+    SEC
+    LDA $105,X      ; fetch retaddr lo
+    SBC #1
+    STA ind0
+    LDA $106,X      ; fetch retaddr hi
+    SBC #0
+    STA ind1
+    LDA (ind0)      ; fetch BRK
 
     PLY
     PLX
@@ -45,6 +55,6 @@ nmi:
 
     .org $fffa
 
-    .word irq
-    .word entry
     .word nmi
+    .word entry
+    .word irq
