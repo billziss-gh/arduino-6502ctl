@@ -1,7 +1,17 @@
-    ; hello.asm: 6502 hello world
+    ; hello.asm: hello world from 6502
 
-    .def ind0 $fe   ; zero page indirect helper lo
-    .def ind1 $ff   ; zero page indirect helper hi
+    .def IND0 $fe   ; zp indirect lo
+    .def IND1 $ff   ; zp indirect hi
+
+    .def IRQN $7000 ; mio: IRQ number register
+
+    .def OREG $7001 ; mio: output register
+    .def OBUF $7020 ; mio: output buffer
+    .def OBUFSIZE 32
+
+    .def IREG $7002 ; mio: input register
+    .def IBUF $7040 ; mio: input buffer
+    .def IBUFSIZE 32
 
     .org $c000
 
@@ -14,9 +24,20 @@ entry:
     TAY             ; Y = #0
     CLI
 
-main:
-    BRK #$42
-    BRA main
+    LDX str
+loop:
+    LDA str,X
+    STA OBUF,X
+    DEX
+    BNE loop
+    LDX str
+    STX OREG
+
+done:
+    BRA done
+
+str:
+    .byte "hello world from 6502\n"
 
 irq:
     PHA
@@ -28,7 +49,11 @@ irq:
     BIT #$10        ; test B bit
     BNE brk
 
-irq_main:
+    LDA IRQN        ; A = IRQ number
+
+irq_exit:
+    LDA #0
+    STA IRQN        ; clear IRQ
 
     PLY
     PLX
@@ -39,11 +64,11 @@ brk:
     SEC
     LDA $105,X      ; fetch retaddr lo
     SBC #1
-    STA ind0
+    STA IND0
     LDA $106,X      ; fetch retaddr hi
     SBC #0
-    STA ind1
-    LDA (ind0)      ; fetch BRK
+    STA IND1
+    LDA (IND0)      ; fetch BRK
 
     PLY
     PLX

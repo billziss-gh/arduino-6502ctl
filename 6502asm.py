@@ -3,7 +3,7 @@
 #
 # Copyright 2022 Bill Zissimopoulos
 
-import argparse, os, sys
+import argparse, codecs, os, shlex, sys
 
 __all__ = ["Assembler", "SyntaxError"]
 
@@ -62,9 +62,12 @@ class Assembler:
             try:
                 self.line += 1
                 line = line.strip()
-                line = line.upper()
                 part = line.split(";", maxsplit=1)
-                part = part[0].split()
+                part = shlex.split(part[0], posix=False)
+                for i in range(len(part)):
+                    if part[i].startswith('"') or part[i].startswith("'"):
+                        continue
+                    part[i] = part[i].upper()
                 if part:
                     if part[0].endswith(":"):
                         self.addlabel(part[0][:-1], self.addr)
@@ -85,10 +88,20 @@ class Assembler:
                 self.adddef(args[0], " ".join(args[1:]))
         elif ".BYTE" == dir:
             for arg in args:
-                val = self.__avalue(arg)
-                if 0x10000 == val:
-                    self.__addfixup(self.addr, 1)
-                self.__text(val, 1)
+                if arg.startswith('"') and arg.endswith('"'):
+                    arg = codecs.escape_decode(arg[1:-1])[0]
+                    self.__text(len(arg), 1)
+                    for c in arg:
+                        self.__text(c, 1)
+                elif arg.startswith("'") and arg.endswith("'"):
+                    arg = codecs.escape_decode(arg[1:-1])[0]
+                    for c in arg:
+                        self.__text(c, 1)
+                else:
+                    val = self.__avalue(arg)
+                    if 0x10000 == val:
+                        self.__addfixup(self.addr, 1)
+                    self.__text(val, 1)
         elif ".WORD" == dir:
             for arg in args:
                 val = self.__avalue(arg)

@@ -191,24 +191,34 @@ static void reset()
     clock_cycle(RESB_1_NCLK);
 }
 
+/* data read/write */
 #define RAMSIZE                         (4 * 1024)
-#define RAMMASK                         (0x0fff)
+#define RAMMASK                         (RAMSIZE - 1)
 #define RAMRGN0                         (0)
-#define RAMRGN1                         (0x7fff)
+#define RAMRGN1                         (0x6fff)
+#define MIOSIZE                         (128)
+#define MIOMASK                         (MIOSIZE - 1)
+#define MIORGN0                         (0x7000)
+#define MIORGN1                         (0x7fff)
 #define ROMSIZE                         (16 * 1024)
-#define ROMMASK                         (0x3fff)
+#define ROMMASK                         (ROMSIZE - 1)
 #define ROMRGN0                         (0x8000)
 #define ROMRGN1                         (0xffff)
 static uint8_t ram[RAMSIZE];
+static uint8_t mio[MIOSIZE];
 static const uint8_t rom[ROMSIZE] PROGMEM =
 {
     #include "6502rom.h"
 };
+static uint8_t read_mio(uint16_t addr);
+static void write_mio(uint16_t addr, uint8_t data);
 static uint8_t read_data(uint16_t addr)
 {
     uint8_t data;
     if (RAMRGN1 >= addr)
         data = ram[addr & RAMMASK];
+    else if (MIORGN1 >= addr)
+        data = read_mio(addr & MIOMASK);
     else
         data = pgm_read_byte(&rom[addr & ROMMASK]);
     return data;
@@ -217,6 +227,52 @@ static void write_data(uint16_t addr, uint8_t data)
 {
     if (RAMRGN1 >= addr)
         ram[addr & RAMMASK] = data;
+    else if (MIORGN1 >= addr)
+        write_mio(addr & MIOMASK, data);
+}
+
+/* memory mapped I/O */
+#define MIO_IRQN                        0
+#define MIO_OREG                        1
+#define MIO_IREG                        2
+#define MIO_OBUF                        32
+#define MIO_OBUFSIZE                    32
+#define MIO_OBUFMASK                    (MIO_OBUFSIZE - 1)
+#define MIO_IBUF                        64
+#define MIO_IBUFSIZE                    32
+#define MIO_IBUFMASK                    (MIO_IBUFSIZE - 1)
+static uint8_t read_mio(uint16_t addr)
+{
+    return mio[addr];
+}
+static void write_mio(uint16_t addr, uint8_t data)
+{
+    switch (addr)
+    {
+    case MIO_IRQN:
+        if (0 == data)
+        {
+            mio[addr] = data;
+            digitalWrite(PIN6502_IRQB, 1);
+        }
+        break;
+    case MIO_OREG:
+        mio[addr] = data;
+        if (0 != data)
+        {
+            Serial.write(mio + MIO_OBUF + 1, data & MIO_OBUFMASK);
+            mio[MIO_OREG] = 0;
+            mio[MIO_IRQN] = MIO_OREG;
+            digitalWrite(PIN6502_IRQB, 0);
+        }
+        break;
+    case MIO_IREG:
+        mio[addr] = data;
+        break;
+    default:
+        mio[addr] = data;
+        break;
+    }
 }
 
 void setup()
@@ -296,17 +352,20 @@ void loop()
 
     clock_fall();
 
-    if (sync)
-        disasm(read_data, addr, disbuf);
+    if (step)
+    {
+        if (sync)
+            disasm(read_data, addr, disbuf);
 
-    snprintf(serbuf, sizeof serbuf, "%c%c%c%c %04x %02x%s%s",
-        rwb ? 'r' : 'W',
-        sync ? 'S' : '-',
-        mlb ? '-' : 'M',
-        vpb ? '-' : 'V',
-        addr,
-        data,
-        sync ? " " : "",
-        sync ? disbuf : "");
-    Serial.println(serbuf);
+        snprintf(serbuf, sizeof serbuf, "%c%c%c%c %04x %02x%s%s",
+            rwb ? 'r' : 'W',
+            sync ? 'S' : '-',
+            mlb ? '-' : 'M',
+            vpb ? '-' : 'V',
+            addr,
+            data,
+            sync ? " " : "",
+            sync ? disbuf : "");
+        Serial.println(serbuf);
+    }
 }
