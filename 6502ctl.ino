@@ -86,7 +86,8 @@ static inline uint8_t read_octl()
 }
 
 /* clock */
-#define CLK_DELAY()                     delayMicroseconds(1)
+#define CLK_DELAY()                     ((void)0)
+//#define CLK_DELAY()                     delayMicroseconds(1)
 static inline void clock_rise()
 {
     write_ictl(P6502_ICTL_PIN(PHI2), 0xff);
