@@ -121,57 +121,39 @@ static void reset()
 /* data read/write */
 #define RAMSIZE                         (4 * 1024)
 #define RAMMASK                         (RAMSIZE - 1)
-#define RAMRGN0                         (0)
-#define RAMRGN1                         (0x6fff)
-#define MIOSIZE                         (128)
-#define MIOMASK                         (MIOSIZE - 1)
-#define MIORGN0                         (0x7000)
-#define MIORGN1                         (0x7fff)
 #define ROMSIZE                         (16 * 1024)
 #define ROMMASK                         (ROMSIZE - 1)
-#define ROMRGN0                         (0x8000)
-#define ROMRGN1                         (0xffff)
+#define RAMADDR(a)                      ((a) < 0x8000)
+#define MIOADDR(a)                      ((a) < 128)
 static uint8_t ram[RAMSIZE];
-static uint8_t mio[MIOSIZE];
 static const uint8_t rom[ROMSIZE] PROGMEM =
 {
     #include "6502rom.h"
 };
-static uint8_t read_mio(uint16_t addr);
 static void write_mio(uint16_t addr, uint8_t data);
-static uint8_t read_data(uint16_t addr)
+static inline uint8_t read_data(uint16_t addr)
 {
-    uint8_t data;
-    if (RAMRGN1 >= addr)
-        data = ram[addr & RAMMASK];
-    else if (MIORGN1 >= addr)
-        data = read_mio(addr & MIOMASK);
+    if (RAMADDR(addr))
+        return ram[addr & RAMMASK];
     else
-        data = pgm_read_byte(&rom[addr & ROMMASK]);
-    return data;
+        return pgm_read_byte(&rom[addr & ROMMASK]);
 }
-static void write_data(uint16_t addr, uint8_t data)
+static inline void write_data(uint16_t addr, uint8_t data)
 {
-    if (RAMRGN1 >= addr)
+    if (MIOADDR(addr))
+        write_mio(addr, data);
+    else
         ram[addr & RAMMASK] = data;
-    else if (MIORGN1 >= addr)
-        write_mio(addr & MIOMASK, data);
 }
 
 /* memory mapped I/O */
-#define MIO_IRQN                        0
-#define MIO_OREG                        1
-#define MIO_IREG                        2
-#define MIO_OBUF                        32
-#define MIO_OBUFSIZE                    32
-#define MIO_OBUFMASK                    (MIO_OBUFSIZE - 1)
-#define MIO_IBUF                        64
-#define MIO_IBUFSIZE                    32
-#define MIO_IBUFMASK                    (MIO_IBUFSIZE - 1)
-static uint8_t read_mio(uint16_t addr)
-{
-    return mio[addr];
-}
+#define MIO_IRQN                        (0)
+#define MIO_OREG                        (64)
+#define MIO_OREGSIZE                    (32)
+#define MIO_OREGMASK                    (MIO_OREGSIZE - 1)
+#define MIO_IREG                        (96)
+#define MIO_IREGSIZE                    (32)
+#define MIO_IREGMASK                    (MIO_IREGSIZE - 1)
 static void write_mio(uint16_t addr, uint8_t data)
 {
     switch (addr)
@@ -179,25 +161,25 @@ static void write_mio(uint16_t addr, uint8_t data)
     case MIO_IRQN:
         if (0 == data)
         {
-            mio[addr] = data;
+            ram[addr] = data;
             write_ictl(P6502_ICTL_PIN(IRQB), 0xff);
         }
         break;
     case MIO_OREG:
-        mio[addr] = data;
+        ram[addr] = data;
         if (0 != data)
         {
-            Serial.write(mio + MIO_OBUF + 1, data & MIO_OBUFMASK);
-            mio[MIO_OREG] = 0;
-            mio[MIO_IRQN] = MIO_OREG;
+            Serial.write(ram + MIO_OREG + 1, data & MIO_OREGMASK);
+            ram[MIO_OREG] = 0;
+            ram[MIO_IRQN] = MIO_OREG;
             write_ictl(P6502_ICTL_PIN(IRQB), 0);
         }
         break;
     case MIO_IREG:
-        mio[addr] = data;
+        ram[addr] = data;
         break;
     default:
-        mio[addr] = data;
+        ram[addr] = data;
         break;
     }
 }

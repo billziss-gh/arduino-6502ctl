@@ -3,15 +3,8 @@
     .def IND0 $fe   ; zp indirect lo
     .def IND1 $ff   ; zp indirect hi
 
-    .def IRQN $7000 ; mio: IRQ number register
-
-    .def OREG $7001 ; mio: output register
-    .def OBUF $7020 ; mio: output buffer
-    .def OBUFSIZE 32
-
-    .def IREG $7002 ; mio: input register
-    .def IBUF $7040 ; mio: input buffer
-    .def IBUFSIZE 32
+    .def IRQN 0     ; mio: IRQ number register
+    .def OREG 64    ; mio: output register
 
     .org $c000
 
@@ -27,7 +20,7 @@ entry:
     LDX str
 loop:
     LDA str,X
-    STA OBUF,X
+    STA OREG,X
     DEX
     BNE loop
     LDX str
