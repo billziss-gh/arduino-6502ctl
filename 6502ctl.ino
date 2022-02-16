@@ -184,6 +184,67 @@ static void write_mio(uint16_t addr, uint8_t data)
     }
 }
 
+/* debug */
+static bool debug_step = 1;
+size_t disasm(uint8_t (*read_data)(uint16_t), uint16_t addr, char buf[16]);
+static void debug_header()
+{
+    Serial.begin(1000000);
+    Serial.println();
+    Serial.println("6502ctl:");
+    Serial.println("    s to step");
+    Serial.println("    c to continue");
+    Serial.println("    b to break");
+    Serial.println("    r to reset");
+}
+static void debug_prolog()
+{
+    while (debug_step || Serial.available())
+    {
+        int c;
+        while (-1 == (c = Serial.read()))
+            ;
+        if (debug_step)
+        {
+            if ('s' == c)
+                break;
+            if ('c' == c)
+            {
+                debug_step = false;
+                break;
+            }
+        }
+        else
+        {
+            if ('b' == c)
+                debug_step = true;
+        }
+        if ('r' == c)
+            reset();
+    }
+}
+static void debug_epilog(uint16_t addr, uint8_t data, uint8_t octl)
+{
+    if (debug_step)
+    {
+        char serbuf[64], disbuf[16];
+
+        if (octl & P6502_OCTL_PIN(SYNC))
+            disasm(read_data, addr, disbuf);
+
+        snprintf(serbuf, sizeof serbuf, "%c%c%c%c %04x %02x%s%s",
+            octl & P6502_OCTL_PIN(RWB) ? 'r' : 'W',
+            octl & P6502_OCTL_PIN(SYNC) ? 'S' : '-',
+            octl & P6502_OCTL_PIN(MLB) ? '-' : 'M',
+            octl & P6502_OCTL_PIN(VPB) ? '-' : 'V',
+            addr,
+            data,
+            octl & P6502_OCTL_PIN(SYNC) ? " " : "",
+            octl & P6502_OCTL_PIN(SYNC) ? disbuf : "");
+        Serial.println(serbuf);
+    }
+}
+
 void setup()
 {
     setup_abus();
@@ -200,79 +261,36 @@ void setup()
 
     reset();
 
-    Serial.begin(1000000);
-    Serial.println();
-    Serial.println("6502ctl:");
-    Serial.println("    s to step");
-    Serial.println("    c to continue");
-    Serial.println("    b to break");
-    Serial.println("    r to reset");
+    debug_header();
 }
 
-size_t disasm(uint8_t (*read_data)(uint16_t), uint16_t addr, char buf[16]);
 void loop()
 {
-    static bool step = 1;
     uint16_t addr;
     uint8_t data;
     uint8_t octl;
-    char serbuf[64], disbuf[16];
-    int c;
 
-    while (step || Serial.available())
+    for (;;)
     {
-        while (-1 == (c = Serial.read()))
-            ;
-        if (step)
+        debug_prolog();
+
+        clock_rise();
+
+        octl = read_octl();
+        addr = read_abus();
+        if (octl & P6502_OCTL_PIN(RWB))
         {
-            if ('s' == c)
-                break;
-            if ('c' == c)
-            {
-                step = false;
-                break;
-            }
+            data = read_data(addr);
+            write_dbus(data);
         }
         else
         {
-            if ('b' == c)
-                step = true;
+            data = read_dbus();
+            write_data(addr, data);
         }
-        if ('r' == c)
-            reset();
-    }
 
-    clock_rise();
+        clock_fall();
 
-    octl = read_octl();
-    addr = read_abus();
-    if (octl & P6502_OCTL_PIN(RWB))
-    {
-        data = read_data(addr);
-        write_dbus(data);
-    }
-    else
-    {
-        data = read_dbus();
-        write_data(addr, data);
-    }
-
-    clock_fall();
-
-    if (step)
-    {
-        if (octl & P6502_OCTL_PIN(SYNC))
-            disasm(read_data, addr, disbuf);
-
-        snprintf(serbuf, sizeof serbuf, "%c%c%c%c %04x %02x%s%s",
-            octl & P6502_OCTL_PIN(RWB) ? 'r' : 'W',
-            octl & P6502_OCTL_PIN(SYNC) ? 'S' : '-',
-            octl & P6502_OCTL_PIN(MLB) ? '-' : 'M',
-            octl & P6502_OCTL_PIN(VPB) ? '-' : 'V',
-            addr,
-            data,
-            octl & P6502_OCTL_PIN(SYNC) ? " " : "",
-            octl & P6502_OCTL_PIN(SYNC) ? disbuf : "");
-        Serial.println(serbuf);
+        debug_epilog(addr, data, octl);
     }
 }
