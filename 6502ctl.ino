@@ -12,123 +12,90 @@
  * https://www.westerndesigncenter.com/wdc/documentation/w65c02s.pdf
  */
 
-/* 6502 address bus pins */
-#define PIN6502_A0                      53
-#define PIN6502_A1                      51
-#define PIN6502_A2                      49
-#define PIN6502_A3                      47
-#define PIN6502_A4                      45
-#define PIN6502_A5                      43
-#define PIN6502_A6                      41
-#define PIN6502_A7                      39
-#define PIN6502_A8                      37
-#define PIN6502_A9                      35
-#define PIN6502_A10                     33
-#define PIN6502_A11                     31
-#define PIN6502_A12                     29
-#define PIN6502_A13                     27
-#define PIN6502_A14                     25
-#define PIN6502_A15                     23
+/* 6502 address bus pins (PF0-7, PK0-7) */
+#define PIN6502_A0                      54
+#define PIN6502_A1                      55
+#define PIN6502_A2                      56
+#define PIN6502_A3                      57
+#define PIN6502_A4                      58
+#define PIN6502_A5                      59
+#define PIN6502_A6                      60
+#define PIN6502_A7                      61
+#define PIN6502_A8                      62
+#define PIN6502_A9                      63
+#define PIN6502_A10                     64
+#define PIN6502_A11                     65
+#define PIN6502_A12                     66
+#define PIN6502_A13                     67
+#define PIN6502_A14                     68
+#define PIN6502_A15                     69
 
-/* 6502 data bus pins */
-#define PIN6502_D0                      52
-#define PIN6502_D1                      50
-#define PIN6502_D2                      48
+/* 6502 data bus pins (PL0-7) */
+#define PIN6502_D0                      49
+#define PIN6502_D1                      48
+#define PIN6502_D2                      47
 #define PIN6502_D3                      46
-#define PIN6502_D4                      44
-#define PIN6502_D5                      42
-#define PIN6502_D6                      40
-#define PIN6502_D7                      38
+#define PIN6502_D4                      45
+#define PIN6502_D5                      44
+#define PIN6502_D6                      43
+#define PIN6502_D7                      42
 
 /* 6502 control pins */
-#define PIN6502_VPB                     34
-#define PIN6502_RDY                     32
-#define PIN6502_PHI1O                   30
+#define PIN6502_VPB                     22
+#define PIN6502_RDY                     24
+#define PIN6502_PHI1O                   26
 #define PIN6502_IRQB                    28
-#define PIN6502_MLB                     26
-#define PIN6502_NMIB                    24
-#define PIN6502_SYNC                    22
-#define PIN6502_RWB                     2
-#define PIN6502_BE                      3
-#define PIN6502_PHI2                    4
-#define PIN6502_SOB                     5
-#define PIN6502_PHI2O                   6
-#define PIN6502_RESB                    7
+#define PIN6502_MLB                     30
+#define PIN6502_NMIB                    32
+#define PIN6502_SYNC                    34
+#define PIN6502_RESB                    23
+#define PIN6502_PHI2O                   25
+#define PIN6502_SOB                     27
+#define PIN6502_PHI2                    29
+#define PIN6502_BE                      31
+#define PIN6502_RWB                     33
 
 /* 6502 address bus */
-static const uint8_t pin_abus[16] =
-{
-    PIN6502_A0,
-    PIN6502_A1,
-    PIN6502_A2,
-    PIN6502_A3,
-    PIN6502_A4,
-    PIN6502_A5,
-    PIN6502_A6,
-    PIN6502_A7,
-    PIN6502_A8,
-    PIN6502_A9,
-    PIN6502_A10,
-    PIN6502_A11,
-    PIN6502_A12,
-    PIN6502_A13,
-    PIN6502_A14,
-    PIN6502_A15,
-};
 static void setup_abus()
 {
-    for (size_t i = 0; 16 > i; i++)
-        pinMode(pin_abus[i], INPUT);
+    /* set Arduino pins 54-69 (ATmega 2560 PF, PK) to INPUT */
+    cli();
+    DDRF = 0;
+    PORTF = 0;
+    DDRK = 0;
+    PORTK = 0;
+    sei();
 }
-static uint16_t read_abus()
+static inline uint16_t read_abus()
 {
-    uint16_t v = 0;
-    for (size_t i = 15; 16 > i; i--)
-    {
-        v <<= 1;
-        v |= digitalRead(pin_abus[i]);
-    }
-    return v;
+    return PINF | (PINK << 8);
 }
 
 /* 6502 data bus */
-static const uint8_t pin_dbus[16] =
-{
-    PIN6502_D0,
-    PIN6502_D1,
-    PIN6502_D2,
-    PIN6502_D3,
-    PIN6502_D4,
-    PIN6502_D5,
-    PIN6502_D6,
-    PIN6502_D7,
-};
 static void setup_dbus()
 {
-    for (size_t i = 0; 8 > i; i++)
-        pinMode(pin_dbus[i], INPUT);
+    /* set Arduino pins 42-49 (ATmega 2560 PL) to INPUT */
+    cli();
+    DDRL = 0;
+    PORTL = 0;
+    sei();
 }
-static uint8_t read_dbus()
+static inline uint8_t read_dbus()
 {
-    for (size_t i = 0; 8 > i; i++)
-        pinMode(pin_dbus[i], INPUT);
-    uint8_t v = 0;
-    for (size_t i = 7; 8 > i; i--)
-    {
-        v <<= 1;
-        v |= digitalRead(pin_dbus[i]);
-    }
-    return v;
+    /* set PL to INPUT and read */
+    cli();
+    DDRL = 0;
+    PORTL = 0;
+    sei();
+    return PINL;
 }
-static void write_dbus(uint8_t v)
+static inline void write_dbus(uint8_t v)
 {
-    for (size_t i = 0; 8 > i; i++)
-        pinMode(pin_dbus[i], OUTPUT);
-    for (size_t i = 0; 8 > i; i++)
-    {
-        digitalWrite(pin_dbus[i], v & 1);
-        v >>= 1;
-    }
+    /* set PL to OUTPUT and write */
+    cli();
+    DDRL = 0xff;
+    PORTL = v;
+    sei();
 }
 
 /* 6502 control */
