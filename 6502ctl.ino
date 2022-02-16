@@ -15,70 +15,89 @@
 /* 6502 address bus */
 static inline void setup_abus()
 {
-    /* set Arduino 54-69 (ATmega2560 PF, PK) to input */
+    /* setup ATmega ports designated for 6502 address bus (ABLO, ABHI) for input */
     cli();
-    DDRF = 0;
-    PORTF = 0;
-    DDRK = 0;
-    PORTK = 0;
+    P6502_ABLO(DDR) = 0;
+    P6502_ABLO(PORT) = 0;
+    P6502_ABHI(DDR) = 0;
+    P6502_ABHI(PORT) = 0;
     sei();
 }
 static inline uint16_t read_abus()
 {
-    return PINF | (PINK << 8);
+    /* read ATmega ports designated for 6502 address bus (ABLO, ABHI) */
+    return P6502_ABLO(PIN) | (P6502_ABHI(PIN) << 8);
 }
 
 /* 6502 data bus */
 static inline void setup_dbus()
 {
-    /* set Arduino 42-49 (ATmega2560 PL) to input */
+    /* setup ATmega port designated for 6502 data bus (DBUS) for input */
     cli();
-    DDRL = 0;
-    PORTL = 0;
+    P6502_DBUS(DDR) = 0;
+    P6502_DBUS(PORT) = 0;
     sei();
 }
 static inline uint8_t read_dbus()
 {
-    /* set ATmega2560 PL to input and read */
+    /* read ATmega port designated for 6502 data bus (DBUS) */
     cli();
-    DDRL = 0;
-    PORTL = 0;
+    P6502_DBUS(DDR) = 0;
+    P6502_DBUS(PORT) = 0;
     sei();
-    return PINL;
+    return P6502_DBUS(PIN);
 }
 static inline void write_dbus(uint8_t v)
 {
-    /* set ATmega2560 PL to output and write */
+    /* write ATmega port designated for 6502 data bus (DBUS) */
     cli();
-    DDRL = 0xff;
-    PORTL = v;
+    P6502_DBUS(DDR) = 0xff;
+    P6502_DBUS(PORT) = v;
     sei();
 }
 
 /* 6502 control */
-static inline void setup_control()
+static inline void setup_ictl()
 {
-    /* set Arduino pins 22-28 (ATmega2560 PA) to output and pins 20-35 (ATmega2560 PC) to input */
+    /* setup ATmega port designated for 6502 input control pins for output */
     cli();
-    DDRA = 0xff;
-    DDRC = 0;
-    PORTC = 0;
+    P6502_ICTL(DDR) = 0xff;
     sei();
+}
+static inline void setup_octl()
+{
+    /* setup ATmega port designated for 6502 output control pins for input */
+    cli();
+    P6502_OCTL(DDR) = 0;
+    P6502_OCTL(PORT) = 0;
+    sei();
+}
+static inline void write_ictl(uint8_t v, uint8_t m)
+{
+    /* write ATmega port designated for 6502 input control pins */
+    cli();
+    P6502_ICTL(PORT) = (P6502_ICTL(PORT) & ~m) | (v & m);
+    sei();
+}
+static inline uint8_t read_octl()
+{
+    /* read ATmega port designated for 6502 output control pins */
+    return P6502_OCTL(PIN);
 }
 
 /* clock */
 #define CLK_DELAY()                     delayMicroseconds(1)
 static inline void clock_rise()
 {
-    digitalWrite(PIN6502_PHI2, 1);
+    write_ictl(0xff, P6502_ICTL_PIN(PHI2));
     CLK_DELAY();
 }
 static inline void clock_fall()
 {
-    digitalWrite(PIN6502_PHI2, 0);
+    write_ictl(0, P6502_ICTL_PIN(PHI2));
     CLK_DELAY();
 }
-static inline void clock_cycle(size_t n = 1)
+static void clock_cycle(size_t n = 1)
 {
     for (size_t i = 0; n > i; i++)
     {
@@ -92,9 +111,9 @@ static inline void clock_cycle(size_t n = 1)
 #define RESB_1_NCLK                     7
 static void reset()
 {
-    digitalWrite(PIN6502_RESB, 0);
+    write_ictl(0, P6502_ICTL_PIN(RESB));
     clock_cycle(RESB_0_NCLK);
-    digitalWrite(PIN6502_RESB, 1);
+    write_ictl(0xff, P6502_ICTL_PIN(RESB));
     clock_cycle(RESB_1_NCLK);
 }
 
@@ -160,7 +179,7 @@ static void write_mio(uint16_t addr, uint8_t data)
         if (0 == data)
         {
             mio[addr] = data;
-            digitalWrite(PIN6502_IRQB, 1);
+            write_ictl(0xff, P6502_ICTL_PIN(IRQB));
         }
         break;
     case MIO_OREG:
@@ -170,7 +189,7 @@ static void write_mio(uint16_t addr, uint8_t data)
             Serial.write(mio + MIO_OBUF + 1, data & MIO_OBUFMASK);
             mio[MIO_OREG] = 0;
             mio[MIO_IRQN] = MIO_OREG;
-            digitalWrite(PIN6502_IRQB, 0);
+            write_ictl(0, P6502_ICTL_PIN(IRQB));
         }
         break;
     case MIO_IREG:
@@ -186,13 +205,16 @@ void setup()
 {
     setup_abus();
     setup_dbus();
-    setup_control();
+    setup_ictl();
+    setup_octl();
 
-    digitalWrite(PIN6502_RDY, 1);
-    digitalWrite(PIN6502_IRQB, 1);
-    digitalWrite(PIN6502_NMIB, 1);
-    digitalWrite(PIN6502_SOB, 1);
-    digitalWrite(PIN6502_BE, 1);
+    write_ictl(
+        P6502_ICTL_PIN(RDY) |
+        P6502_ICTL_PIN(IRQB) |
+        P6502_ICTL_PIN(NMIB) |
+        P6502_ICTL_PIN(SOB) |
+        P6502_ICTL_PIN(BE),
+        0xff);
 
     reset();
 
@@ -211,7 +233,7 @@ void loop()
     static bool step = 1;
     uint16_t addr;
     uint8_t data;
-    uint8_t rwb, sync, mlb, vpb;
+    uint8_t octl;
     char serbuf[64], disbuf[16];
     int c;
 
@@ -240,9 +262,9 @@ void loop()
 
     clock_rise();
 
+    octl = read_octl();
     addr = read_abus();
-    rwb = digitalRead(PIN6502_RWB);
-    if (rwb)
+    if (octl & P6502_OCTL_PIN(RWB))
     {
         data = read_data(addr);
         write_dbus(data);
@@ -253,26 +275,22 @@ void loop()
         write_data(addr, data);
     }
 
-    sync = digitalRead(PIN6502_SYNC);
-    mlb = digitalRead(PIN6502_MLB);
-    vpb = digitalRead(PIN6502_VPB);
-
     clock_fall();
 
     if (step)
     {
-        if (sync)
+        if (octl & P6502_OCTL_PIN(SYNC))
             disasm(read_data, addr, disbuf);
 
         snprintf(serbuf, sizeof serbuf, "%c%c%c%c %04x %02x%s%s",
-            rwb ? 'r' : 'W',
-            sync ? 'S' : '-',
-            mlb ? '-' : 'M',
-            vpb ? '-' : 'V',
+            octl & P6502_OCTL_PIN(RWB) ? 'r' : 'W',
+            octl & P6502_OCTL_PIN(SYNC) ? 'S' : '-',
+            octl & P6502_OCTL_PIN(MLB) ? '-' : 'M',
+            octl & P6502_OCTL_PIN(VPB) ? '-' : 'V',
             addr,
             data,
-            sync ? " " : "",
-            sync ? disbuf : "");
+            octl & P6502_OCTL_PIN(SYNC) ? " " : "",
+            octl & P6502_OCTL_PIN(SYNC) ? disbuf : "");
         Serial.println(serbuf);
     }
 }

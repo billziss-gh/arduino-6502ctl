@@ -22,6 +22,8 @@
 #define PIN6502_A13                     67
 #define PIN6502_A14                     68
 #define PIN6502_A15                     69
+#define P6502_ABLO(n)                   n ## F
+#define P6502_ABHI(n)                   n ## K
 
 /* 6502 data bus pins (ATmega2560 PL0-7) */
 #define PIN6502_D0                      49
@@ -32,6 +34,7 @@
 #define PIN6502_D5                      44
 #define PIN6502_D6                      43
 #define PIN6502_D7                      42
+#define P6502_DBUS(n)                   n ## L
 
 /* 6502 input control pins (ATmega2560 PA0-6) */
 #define PIN6502_RDY                     22
@@ -41,11 +44,18 @@
 #define PIN6502_SOB                     26
 #define PIN6502_PHI2                    27
 #define PIN6502_BE                      28
+#define PIN6502_ICTL_UNUSED7            29
+#define P6502_ICTL(n)                   n ## A
+#define P6502_ICTL_PIN(n)               (1 << (PIN6502_ ## n - PIN6502_RDY))
 
-/* 6502 output control pins (ATmega2560 PC0-5) */
-#define PIN6502_VPB                     30
-#define PIN6502_PHI1O                   31
-#define PIN6502_MLB                     32
-#define PIN6502_SYNC                    33
-#define PIN6502_PHI2O                   34
+/* 6502 output control pins (ATmega2560 PC2-7) */
+#define PIN6502_OCTL_UNUSED0            37
+#define PIN6502_OCTL_UNUSED1            36
 #define PIN6502_RWB                     35
+#define PIN6502_PHI2O                   34
+#define PIN6502_SYNC                    33
+#define PIN6502_MLB                     32
+#define PIN6502_PHI1O                   31
+#define PIN6502_VPB                     30
+#define P6502_OCTL(n)                   n ## C
+#define P6502_OCTL_PIN(n)               (1 << (PIN6502_OCTL_UNUSED0 - PIN6502_ ## n))
