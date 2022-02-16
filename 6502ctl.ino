@@ -2,63 +2,20 @@
  * 6502ctl.ino
  * 6502 controller
  *
+ * W65C02S
+ * https://www.westerndesigncenter.com/wdc/documentation/w65c02s.pdf
+ *
  * Copyright 2022 Bill Zissimopoulos
  */
 
+#include "6502pins.h"
+
 #define SERIAL_SPEED                    1000000
 
-/*
- * W65C02S
- * https://www.westerndesigncenter.com/wdc/documentation/w65c02s.pdf
- */
-
-/* 6502 address bus pins (PF0-7, PK0-7) */
-#define PIN6502_A0                      54
-#define PIN6502_A1                      55
-#define PIN6502_A2                      56
-#define PIN6502_A3                      57
-#define PIN6502_A4                      58
-#define PIN6502_A5                      59
-#define PIN6502_A6                      60
-#define PIN6502_A7                      61
-#define PIN6502_A8                      62
-#define PIN6502_A9                      63
-#define PIN6502_A10                     64
-#define PIN6502_A11                     65
-#define PIN6502_A12                     66
-#define PIN6502_A13                     67
-#define PIN6502_A14                     68
-#define PIN6502_A15                     69
-
-/* 6502 data bus pins (PL0-7) */
-#define PIN6502_D0                      49
-#define PIN6502_D1                      48
-#define PIN6502_D2                      47
-#define PIN6502_D3                      46
-#define PIN6502_D4                      45
-#define PIN6502_D5                      44
-#define PIN6502_D6                      43
-#define PIN6502_D7                      42
-
-/* 6502 control pins */
-#define PIN6502_VPB                     22
-#define PIN6502_RDY                     24
-#define PIN6502_PHI1O                   26
-#define PIN6502_IRQB                    28
-#define PIN6502_MLB                     30
-#define PIN6502_NMIB                    32
-#define PIN6502_SYNC                    34
-#define PIN6502_RESB                    23
-#define PIN6502_PHI2O                   25
-#define PIN6502_SOB                     27
-#define PIN6502_PHI2                    29
-#define PIN6502_BE                      31
-#define PIN6502_RWB                     33
-
 /* 6502 address bus */
-static void setup_abus()
+static inline void setup_abus()
 {
-    /* set Arduino pins 54-69 (ATmega 2560 PF, PK) to INPUT */
+    /* set Arduino 54-69 (ATmega2560 PF, PK) to input */
     cli();
     DDRF = 0;
     PORTF = 0;
@@ -72,9 +29,9 @@ static inline uint16_t read_abus()
 }
 
 /* 6502 data bus */
-static void setup_dbus()
+static inline void setup_dbus()
 {
-    /* set Arduino pins 42-49 (ATmega 2560 PL) to INPUT */
+    /* set Arduino 42-49 (ATmega2560 PL) to input */
     cli();
     DDRL = 0;
     PORTL = 0;
@@ -82,7 +39,7 @@ static void setup_dbus()
 }
 static inline uint8_t read_dbus()
 {
-    /* set PL to INPUT and read */
+    /* set ATmega2560 PL to input and read */
     cli();
     DDRL = 0;
     PORTL = 0;
@@ -91,7 +48,7 @@ static inline uint8_t read_dbus()
 }
 static inline void write_dbus(uint8_t v)
 {
-    /* set PL to OUTPUT and write */
+    /* set ATmega2560 PL to output and write */
     cli();
     DDRL = 0xff;
     PORTL = v;
@@ -99,46 +56,29 @@ static inline void write_dbus(uint8_t v)
 }
 
 /* 6502 control */
-static const uint8_t pin_icontrol[] =
+static inline void setup_control()
 {
-    PIN6502_RDY,
-    PIN6502_IRQB,
-    PIN6502_NMIB,
-    PIN6502_PHI2,
-    PIN6502_SOB,
-    PIN6502_RESB,
-    PIN6502_BE,
-};
-static const uint8_t pin_ocontrol[] =
-{
-    PIN6502_VPB,
-    PIN6502_PHI1O,
-    PIN6502_MLB,
-    PIN6502_SYNC,
-    PIN6502_RWB,
-    PIN6502_PHI2O,
-};
-static void setup_control()
-{
-    for (size_t i = 0; sizeof pin_icontrol / sizeof pin_icontrol[0] > i; i++)
-        pinMode(pin_icontrol[i], OUTPUT);
-    for (size_t i = 0; sizeof pin_ocontrol / sizeof pin_ocontrol[0] > i; i++)
-        pinMode(pin_ocontrol[i], INPUT);
+    /* set Arduino pins 22-28 (ATmega2560 PA) to output and pins 20-35 (ATmega2560 PC) to input */
+    cli();
+    DDRA = 0xff;
+    DDRC = 0;
+    PORTC = 0;
+    sei();
 }
 
 /* clock */
 #define CLK_DELAY()                     delayMicroseconds(1)
-static void clock_rise()
+static inline void clock_rise()
 {
     digitalWrite(PIN6502_PHI2, 1);
     CLK_DELAY();
 }
-static void clock_fall()
+static inline void clock_fall()
 {
     digitalWrite(PIN6502_PHI2, 0);
     CLK_DELAY();
 }
-static void clock_cycle(size_t n = 1)
+static inline void clock_cycle(size_t n = 1)
 {
     for (size_t i = 0; n > i; i++)
     {
