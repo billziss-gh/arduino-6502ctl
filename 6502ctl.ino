@@ -72,7 +72,7 @@ static inline void setup_octl()
     P6502_OCTL(PORT) = 0;
     sei();
 }
-static inline void write_ictl(uint8_t v, uint8_t m)
+static inline void write_ictl(uint8_t m, uint8_t v)
 {
     /* write ATmega port designated for 6502 input control pins */
     cli();
@@ -89,12 +89,12 @@ static inline uint8_t read_octl()
 #define CLK_DELAY()                     delayMicroseconds(1)
 static inline void clock_rise()
 {
-    write_ictl(0xff, P6502_ICTL_PIN(PHI2));
+    write_ictl(P6502_ICTL_PIN(PHI2), 0xff);
     CLK_DELAY();
 }
 static inline void clock_fall()
 {
-    write_ictl(0, P6502_ICTL_PIN(PHI2));
+    write_ictl(P6502_ICTL_PIN(PHI2), 0);
     CLK_DELAY();
 }
 static void clock_cycle(size_t n = 1)
@@ -111,9 +111,9 @@ static void clock_cycle(size_t n = 1)
 #define RESB_1_NCLK                     7
 static void reset()
 {
-    write_ictl(0, P6502_ICTL_PIN(RESB));
+    write_ictl(P6502_ICTL_PIN(RESB), 0);
     clock_cycle(RESB_0_NCLK);
-    write_ictl(0xff, P6502_ICTL_PIN(RESB));
+    write_ictl(P6502_ICTL_PIN(RESB), 0xff);
     clock_cycle(RESB_1_NCLK);
 }
 
@@ -179,7 +179,7 @@ static void write_mio(uint16_t addr, uint8_t data)
         if (0 == data)
         {
             mio[addr] = data;
-            write_ictl(0xff, P6502_ICTL_PIN(IRQB));
+            write_ictl(P6502_ICTL_PIN(IRQB), 0xff);
         }
         break;
     case MIO_OREG:
@@ -189,7 +189,7 @@ static void write_mio(uint16_t addr, uint8_t data)
             Serial.write(mio + MIO_OBUF + 1, data & MIO_OBUFMASK);
             mio[MIO_OREG] = 0;
             mio[MIO_IRQN] = MIO_OREG;
-            write_ictl(0, P6502_ICTL_PIN(IRQB));
+            write_ictl(P6502_ICTL_PIN(IRQB), 0);
         }
         break;
     case MIO_IREG:
@@ -208,13 +208,12 @@ void setup()
     setup_ictl();
     setup_octl();
 
-    write_ictl(
+    write_ictl(0xff,
         P6502_ICTL_PIN(RDY) |
         P6502_ICTL_PIN(IRQB) |
         P6502_ICTL_PIN(NMIB) |
         P6502_ICTL_PIN(SOB) |
-        P6502_ICTL_PIN(BE),
-        0xff);
+        P6502_ICTL_PIN(BE));
 
     reset();
 
