@@ -16,12 +16,10 @@
 static inline void setup_abus()
 {
     /* setup ATmega ports designated for 6502 address bus (ABLO, ABHI) for input */
-    cli();
     P6502_ABLO(DDR) = 0;
     P6502_ABLO(PORT) = 0;
     P6502_ABHI(DDR) = 0;
     P6502_ABHI(PORT) = 0;
-    sei();
 }
 static inline uint16_t read_abus()
 {
@@ -33,51 +31,39 @@ static inline uint16_t read_abus()
 static inline void setup_dbus()
 {
     /* setup ATmega port designated for 6502 data bus (DBUS) for input */
-    cli();
     P6502_DBUS(DDR) = 0;
     P6502_DBUS(PORT) = 0;
-    sei();
 }
 static inline uint8_t read_dbus()
 {
     /* read ATmega port designated for 6502 data bus (DBUS) */
-    cli();
     P6502_DBUS(DDR) = 0;
     P6502_DBUS(PORT) = 0;
-    sei();
     return P6502_DBUS(PIN);
 }
 static inline void write_dbus(uint8_t v)
 {
     /* write ATmega port designated for 6502 data bus (DBUS) */
-    cli();
     P6502_DBUS(DDR) = 0xff;
     P6502_DBUS(PORT) = v;
-    sei();
 }
 
 /* 6502 control */
 static inline void setup_ictl()
 {
     /* setup ATmega port designated for 6502 input control pins for output */
-    cli();
     P6502_ICTL(DDR) = 0xff;
-    sei();
 }
 static inline void setup_octl()
 {
     /* setup ATmega port designated for 6502 output control pins for input */
-    cli();
     P6502_OCTL(DDR) = 0;
     P6502_OCTL(PORT) = 0;
-    sei();
 }
 static inline void write_ictl(uint8_t m, uint8_t v)
 {
     /* write ATmega port designated for 6502 input control pins */
-    cli();
     P6502_ICTL(PORT) = (P6502_ICTL(PORT) & ~m) | (v & m);
-    sei();
 }
 static inline uint8_t read_octl()
 {
@@ -169,7 +155,9 @@ static void write_mio(uint16_t addr, uint8_t data)
         ram[addr] = data;
         if (0 != data)
         {
+            sei();
             Serial.write(ram + MIO_OREG + 1, data & MIO_OREGMASK);
+            cli();
             ram[MIO_OREG] = 0;
             ram[MIO_IRQN] = MIO_OREG;
             write_ictl(P6502_ICTL_PIN(IRQB), 0);
@@ -199,6 +187,8 @@ static void debug_header()
 }
 static void debug(uint16_t addr, uint8_t data, uint8_t octl)
 {
+    sei();
+
     if (debug_step)
     {
         char serbuf[64], disbuf[16];
@@ -227,27 +217,44 @@ static void debug(uint16_t addr, uint8_t data, uint8_t octl)
         {
         case 's': /* step */
             if (debug_step)
-                return;
+                goto exit;
             break;
         case 'c': /* continue */
             if (debug_step)
             {
                 debug_step = false;
-                return;
+                goto exit;
             }
             break;
         case 'b': /* break */
             if (!debug_step)
             {
                 debug_step = true;
-                return;
+                goto exit;
             }
             break;
         case 'r': /* reset */
             reset();
-            return;
+            goto exit;
         }
     }
+
+exit:
+    cli();
+}
+static inline bool debug_available()
+{
+    /*
+     * ATmega 2560 datasheet 23.6.2
+     *
+     * UCSRnA – USART MSPIM Control and Status Register n A
+     *
+     * Bit 7 - RXCn: USART Receive Complete
+     *
+     * This flag bit is set when there are unread data in the receive buffer and cleared when the
+     * receive buffer is empty (that is, does not contain any unread data).
+     */
+    return debug_step || (UCSR0A & (1 << RXC0));
 }
 
 void setup()
@@ -275,6 +282,8 @@ void loop()
     uint8_t data;
     uint8_t octl;
 
+    cli();
+
     for (;;)
     {
         clock_rise();
@@ -294,6 +303,7 @@ void loop()
 
         clock_fall();
 
-        debug(addr, data, octl);
+        //if (debug_available())
+            debug(addr, data, octl);
     }
 }
