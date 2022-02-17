@@ -197,33 +197,7 @@ static void debug_header()
     Serial.println("    b to break");
     Serial.println("    r to reset");
 }
-static void debug_prolog()
-{
-    while (debug_step || Serial.available())
-    {
-        int c;
-        while (-1 == (c = Serial.read()))
-            ;
-        if (debug_step)
-        {
-            if ('s' == c)
-                break;
-            if ('c' == c)
-            {
-                debug_step = false;
-                break;
-            }
-        }
-        else
-        {
-            if ('b' == c)
-                debug_step = true;
-        }
-        if ('r' == c)
-            reset();
-    }
-}
-static void debug_epilog(uint16_t addr, uint8_t data, uint8_t octl)
+static void debug(uint16_t addr, uint8_t data, uint8_t octl)
 {
     if (debug_step)
     {
@@ -242,6 +216,37 @@ static void debug_epilog(uint16_t addr, uint8_t data, uint8_t octl)
             octl & P6502_OCTL_PIN(SYNC) ? " " : "",
             octl & P6502_OCTL_PIN(SYNC) ? disbuf : "");
         Serial.println(serbuf);
+    }
+
+    while (debug_step || Serial.available())
+    {
+        int c;
+        while (-1 == (c = Serial.read()))
+            ;
+        switch (c)
+        {
+        case 's': /* step */
+            if (debug_step)
+                return;
+            break;
+        case 'c': /* continue */
+            if (debug_step)
+            {
+                debug_step = false;
+                return;
+            }
+            break;
+        case 'b': /* break */
+            if (!debug_step)
+            {
+                debug_step = true;
+                return;
+            }
+            break;
+        case 'r': /* reset */
+            reset();
+            return;
+        }
     }
 }
 
@@ -272,8 +277,6 @@ void loop()
 
     for (;;)
     {
-        debug_prolog();
-
         clock_rise();
 
         octl = read_octl();
@@ -291,6 +294,6 @@ void loop()
 
         clock_fall();
 
-        debug_epilog(addr, data, octl);
+        debug(addr, data, octl);
     }
 }
