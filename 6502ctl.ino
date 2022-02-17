@@ -303,7 +303,7 @@ void loop()
 
         clock_fall();
 
-        //if (debug_available())
+        if (debug_available())
             debug(addr, data, octl);
     }
 }
