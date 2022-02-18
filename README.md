@@ -58,7 +58,7 @@ This software consists of the following components:
 
 After connecting all hardware components and the Arduino MEGA 2560 to the host computer, open this project in the Arduino IDE. Upload the sketch to the Arduino and open the Serial Monitor and set it to 1000000 baud.
 
-You will be presented with the following (there may also be some garbage characters before this message from the serial interface - you can ignore these):
+We will be presented with the following (there may also be some garbage characters before this message from the serial interface - we can ignore these):
 
 ```
 6502ctl:
@@ -69,7 +69,7 @@ You will be presented with the following (there may also be some garbage charact
 r--V fffc 00
 ```
 
-The 6502ctl debugger informs you of the few commands that it supports:
+The 6502ctl debugger informs us of the few commands that it supports:
 
 - `s` to step a single clock cycle
 - `c` to continue (i.e. run without stepping)
@@ -93,7 +93,7 @@ r--V fffd c0
 
 The 6502 is `r`eading from hex address `$fffd` the value `$c0`. The 6502 is accessing a `V`ector location.
 
-You are seeing the 6502 reset sequence. After a reset the 6502 expects to find the start of the program at location `$fffc`. Because this is a 16-bit address this is stored in locations `$fffc` and `$fffd`. The 6502 read the values `$00` and `$c0` which together comprise the address `$c000` (in little-endian format). This is where our program starts.
+We are seeing the 6502 reset sequence. After a reset the 6502 expects to find the start of the program at location `$fffc`. Because this is a 16-bit address this is stored in locations `$fffc` and `$fffd`. The 6502 read the values `$00` and `$c0` which together comprise the address `$c000` (in little-endian format). This is where our program starts.
 
 Enter `s` again and press ENTER:
 
@@ -135,7 +135,7 @@ rS-- c003 9a TXS
 
 The 6502 is now reading another instruction: `TXS` (transfer register X to the stack pointer).
 
-At this point we can just continue execution by entering 'c` and pressing ENTER:
+At this point we can just continue execution by entering `c` and pressing ENTER:
 
 ```
 hello world from 6502
@@ -159,7 +159,7 @@ The 6502 is executing its reset sequence again.
 
 ![Serial Monitor](serialmon.png)
 
-**NOTE**: Most modern debuggers show the next statement/instruction that is going to be executed. The 6502ctl debugger always shows the last operation (not instrustion) that was executed.
+**NOTE**: Most modern debuggers show the next statement/instruction that is going to be executed. The 6502ctl debugger always shows the last operation (not instruction) that was executed.
 
 ### How it works
 
