@@ -12,6 +12,11 @@
 
 #define SERIAL_SPEED                    1000000
 
+/* TMSR - time measurement
+ * define to 1 to include time measurement code
+ */
+#define TMSR                            0
+
 /* 6502 address bus */
 static inline void setup_abus()
 {
@@ -73,7 +78,6 @@ static inline uint8_t read_octl()
 
 /* clock */
 #define CLK_DELAY()                     ((void)0)
-//#define CLK_DELAY()                     delayMicroseconds(1)
 static inline void clock_rise()
 {
     write_ictl(P6502_ICTL_PIN(PHI2), 0xff);
@@ -172,6 +176,25 @@ static void write_mio(uint16_t addr, uint8_t data)
     }
 }
 
+/* time measurements */
+/*
+ * It is best to try this with the debugger initially disabled (debug_step = 0) and
+ * with programs that do not use Serial I/O (which is slow). For example:
+ *
+ *     entry: BRA entry
+ *
+ * Otherwise results will be unreliable, because we have interrupts disabled and our
+ * timers are not getting updated properly.
+ */
+#if TMSR
+static unsigned long tmsr_tcnt, tmsr_lcnt;
+#define TMSR_INIT(t)                    unsigned long t = micros()
+#define TMSR_LOOP(t)                    ({unsigned long n = micros(); tmsr_tcnt += (uint8_t)(n - t); t = n; tmsr_lcnt++;})
+#else
+#define TMSR_INIT(t)                    ((void)0)
+#define TMSR_LOOP(t)                    ((void)0)
+#endif
+
 /* debug */
 static bool debug_step = 1;
 size_t disasm(uint8_t (*read_data)(uint16_t), uint16_t addr, char buf[16]);
@@ -206,6 +229,12 @@ static void debug(uint16_t addr, uint8_t data, uint8_t octl)
             octl & P6502_OCTL_PIN(SYNC) ? " " : "",
             octl & P6502_OCTL_PIN(SYNC) ? disbuf : "");
         Serial.println(serbuf);
+
+#if TMSR
+        snprintf(serbuf, sizeof serbuf, "avg %lu us",
+            tmsr_tcnt / tmsr_lcnt);
+        Serial.println(serbuf);
+#endif
     }
 
     while (debug_step || Serial.available())
@@ -284,6 +313,7 @@ void loop()
 
     cli();
 
+    TMSR_INIT(time);
     for (;;)
     {
         clock_rise();
@@ -303,7 +333,10 @@ void loop()
 
         clock_fall();
 
-        if (debug_available())
-            debug(addr, data, octl);
+        if (!debug_available())
+            continue;
+
+        TMSR_LOOP(time);
+        debug(addr, data, octl);
     }
 }
