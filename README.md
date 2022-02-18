@@ -161,6 +161,75 @@ The 6502 is executing its reset sequence again.
 
 **NOTE**: Most modern debuggers show the next statement/instruction that is going to be executed. The 6502ctl debugger always shows the last operation (not instrustion) that was executed.
 
+### How it works
+
+The main `loop` of 6502ctl is as follows (some detail removed for this discussion):
+
+```C
+void loop()
+{
+    uint16_t addr;
+    uint8_t data;
+    uint8_t octl;
+
+    cli();                              // 1. Disable interrupts
+
+    for (;;)
+    {
+        clock_rise();                   // 2. Clock goes high
+
+        octl = read_octl();             // 3. Read 6502 output control pins
+        addr = read_abus();             // 4. Read address from 6502 address bus
+        if (octl & P6502_OCTL_PIN(RWB)) // 5. Test the RWB pin
+        {
+            data = read_data(addr);     // 6. Read data from simulated ROM, RAM or MMIO
+            write_dbus(data);           // 7. Write data to data bus
+        }
+        else
+        {
+            data = read_dbus();         // 8. Read data from data bus
+            write_data(addr, data);     // 9. Write data to simulated ROM, RAM or MMIO
+        }
+
+        clock_fall();                   // 10. Clock goes low
+
+        if (debug_available())          // 11. Fast check if debugger is active
+            debug(addr, data, octl);    // 12. Debugger implementation
+    }
+}
+```
+
+A few things to note:
+
+- Arduino interrupts are disabled in order to maximize performance in the core loop. Arduino interrupts are enabled only for serial communications and the debugger.
+- All communication with the 6502 happens while the clock is high.
+- Communication with the 6502 does not happen via Arduino's `digitalRead` / `digitalWrite`, because this would make the loop very slow. Instead the ATmega2560 ports are accessed directly. For example to read from the address bus we do:
+    ```C
+    static inline uint16_t read_abus()
+    {
+        /* read ATmega ports designated for 6502 address bus (ABLO, ABHI) */
+        return P6502_ABLO(PIN) | (P6502_ABHI(PIN) << 8);
+    }
+    ```
+-  We want maximum performance when the debugger is not active, but we also want to be able to break execution into the debugger. Recall that we have Arduino interrupts disabled and we therefore need another method to check if there is any user input. For this purpose we perform a quick check using the `debug_available` function, which returns `true` when the debugger is active or there is user input:
+    ```C
+    static inline bool debug_available()
+    {
+        /*
+        * ATmega 2560 datasheet 23.6.2
+        *
+        * UCSRnA – USART MSPIM Control and Status Register n A
+        *
+        * Bit 7 - RXCn: USART Receive Complete
+        *
+        * This flag bit is set when there are unread data in the receive buffer and cleared when the
+        * receive buffer is empty (that is, does not contain any unread data).
+        */
+        return debug_step || (UCSR0A & (1 << RXC0));
+    }
+
+    ```
+
 ### Assembler
 
 This project includes a simple 6502 assembler written in Python. The assembler understands all 6502 instructions, and supports labels and a limited set of directives.
