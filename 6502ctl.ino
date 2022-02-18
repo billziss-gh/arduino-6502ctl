@@ -185,11 +185,21 @@ static void write_mio(uint16_t addr, uint8_t data)
  *
  * Otherwise results will be unreliable, because we have interrupts disabled and our
  * timers are not getting updated properly.
+ *
+ * On the ATmega 2560 the full clock cycle (see loop()) is around 7 us,
+ * which gives a max speed of 1000000 / 7 = 143KHz.
  */
 #if TMSR
 static unsigned long tmsr_tcnt, tmsr_lcnt;
-#define TMSR_INIT(t)                    unsigned long t = micros()
-#define TMSR_LOOP(t)                    ({unsigned long n = micros(); tmsr_tcnt += (uint8_t)(n - t); t = n; tmsr_lcnt++;})
+#define TMSR_FACT                       (64000000L / F_CPU)
+#define TMSR_INIT(t)                    uint8_t t = TCNT0
+#define TMSR_LOOP(t)                    \
+    ({                                  \
+        uint8_t n = TCNT0;              \
+        tmsr_tcnt += TMSR_FACT * (uint8_t)(n - t);\
+        tmsr_lcnt++;                    \
+        t = n;                          \
+    })
 #else
 #define TMSR_INIT(t)                    ((void)0)
 #define TMSR_LOOP(t)                    ((void)0)
@@ -333,10 +343,12 @@ void loop()
 
         clock_fall();
 
-        if (!debug_available())
-            continue;
-
-        TMSR_LOOP(time);
-        debug(addr, data, octl);
+        if (debug_available())
+        {
+            TMSR_LOOP(time);
+            debug(addr, data, octl);
+        }
+        else
+            TMSR_LOOP(time);
     }
 }
