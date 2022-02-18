@@ -12,10 +12,38 @@
 
 #define SERIAL_SPEED                    1000000
 
-/* TMSR - time measurement
- * define to 1 to include time measurement code
+/* TMSR - time measurement */
+/*
+ * It is best to try this with the debugger initially disabled (debug_step = 0) and
+ * with programs that do not use Serial I/O (which is slow). For example:
+ *
+ *     entry:
+ *         LDA $100
+ *         STA $100
+ *         BRA entry
+ *
+ * Otherwise results will be unreliable, because we have interrupts disabled and our
+ * timers are not getting updated properly.
+ *
+ * On the ATmega 2560 the avg clock cycle (see loop()) for the above program is 4.948 us,
+ * which gives a max speed of 1000000 / 4.948 = 202KHz.
  */
 #define TMSR                            0
+#if TMSR
+static unsigned long tmsr_tcnt, tmsr_lcnt;
+#define TMSR_FACT                       (64000000L / F_CPU)
+#define TMSR_INIT(t)                    uint8_t t = TCNT0
+#define TMSR_LOOP(t)                    \
+    ({                                  \
+        uint8_t n = TCNT0;              \
+        tmsr_tcnt += (uint8_t)(n - t);  \
+        tmsr_lcnt++;                    \
+        t = TCNT0;                      \
+    })
+#else
+#define TMSR_INIT(t)                    ((void)0)
+#define TMSR_LOOP(t)                    ((void)0)
+#endif
 
 /* 6502 address bus */
 static inline void setup_abus()
@@ -176,35 +204,6 @@ static void write_mio(uint16_t addr, uint8_t data)
     }
 }
 
-/* time measurements */
-/*
- * It is best to try this with the debugger initially disabled (debug_step = 0) and
- * with programs that do not use Serial I/O (which is slow). For example:
- *
- *     entry: BRA entry
- *
- * Otherwise results will be unreliable, because we have interrupts disabled and our
- * timers are not getting updated properly.
- *
- * On the ATmega 2560 the full clock cycle (see loop()) is around 7 us,
- * which gives a max speed of 1000000 / 7 = 143KHz.
- */
-#if TMSR
-static unsigned long tmsr_tcnt, tmsr_lcnt;
-#define TMSR_FACT                       (64000000L / F_CPU)
-#define TMSR_INIT(t)                    uint8_t t = TCNT0
-#define TMSR_LOOP(t)                    \
-    ({                                  \
-        uint8_t n = TCNT0;              \
-        tmsr_tcnt += TMSR_FACT * (uint8_t)(n - t);\
-        tmsr_lcnt++;                    \
-        t = n;                          \
-    })
-#else
-#define TMSR_INIT(t)                    ((void)0)
-#define TMSR_LOOP(t)                    ((void)0)
-#endif
-
 /* debug */
 static bool debug_step = 1;
 size_t disasm(uint8_t (*read_data)(uint16_t), uint16_t addr, char buf[16]);
@@ -241,8 +240,11 @@ static void debug(uint16_t addr, uint8_t data, uint8_t octl)
         Serial.println(serbuf);
 
 #if TMSR
-        snprintf(serbuf, sizeof serbuf, "avg %lu us",
-            tmsr_tcnt / tmsr_lcnt);
+        float avg = TMSR_FACT * (float)tmsr_tcnt / (float)tmsr_lcnt;
+        float iavg, favg;
+        favg = modff(avg, &iavg);
+        snprintf(serbuf, sizeof serbuf, "avg %d.%d us",
+            (int)iavg, (int)(favg * 1000));
         Serial.println(serbuf);
 #endif
     }
