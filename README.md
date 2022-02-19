@@ -262,7 +262,7 @@ python 6502asm.py hello.asm -o 6502rom.h
 
 Will assemble the file `hello.asm` and produce the file `6502rom.h`.
 
-**NOTE**: The assembler is a work in progress and has not been tested fully. It currently assembles the file hello.asm correctly, but it may contain bugs or may be missing features vital for larger programs.
+**NOTE**: The assembler is a work in progress and has not been tested fully. It currently assembles the file `hello.asm` correctly, but it may contain bugs or may be missing features vital for larger programs.
 
 ## Simulated architecture
 
