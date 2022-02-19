@@ -58,7 +58,7 @@ This software consists of the following components:
 
 After connecting all hardware components and the Arduino MEGA 2560 to the host computer, open this project in the Arduino IDE. Upload the sketch to the Arduino and open the Serial Monitor and set it to 1000000 baud.
 
-We will be presented with the following (there may also be some garbage characters before this message from the serial interface - we can ignore these):
+The following will appear in the Arduino Serial Monitor (there may also be some garbage characters before this message from the serial interface - we can ignore these):
 
 ```
 6502ctl:
@@ -76,14 +76,24 @@ The 6502ctl debugger informs us of the few commands that it supports:
 - `b` to break into the debugger after continuing
 - `r` to reset the 6502
 
-The debugger follows up with the line `r--V fffc 00`, which means that the 6502 is `r`eading from hex address `$fffc` the value `$00`. The 6502 is accessing a `V`ector location. This is part of the 6502's startup/reset sequence which is explained below.
+The debugger also follows up with a line that describes the operation that the 6502 just performed. Every clock signal the 6502 performs an operation and the debugger (if active) will output a line describing that operation. The line contains information about some of the 6502 control pins, the address bus and data bus values and possibly a disassembled instruction.
 
-The characters `r--V` encode values from some 6502 control pins:
+The line has the general format:
+
+```
+[rW][S-][-M][-V] ADDR DATA INSTR?
+```
+
+The 4 first characters encode values from the 6502 control pins:
 
 - `r` or `W`: RWB pin; determines whether the 6502 is trying to `r`ead or `W`rite.
 - `S` or `-`: SYNC pin; determines whether the 6502 is fetching an instruction opcode.
 - `-` or `M`: MLB pin; the 6502 sets this pin for some "Read-Modify-Write" instructions.
 - `-` or `V`: VPB pin; determines whether the 6502 is accessing a vector location (e.g. RESET).
+
+The `ADDR` is the hex address that the 6502 is accessing. The `DATA` is the hex value that the 6502 is reading or writing. The `INSTR` is the disassembled instruction and only appears when the debugger determines that the 6502 is fetching an instruction opcode (when the SYNC pin is high).
+
+We can now interpret the line `r--V fffc 00`. This means that the 6502 is `r`eading from hex address `$fffc` the value `$00` and is accessing a `V`ector location (RESET). This is part of the 6502's startup/reset sequence.
 
 In the Serial Monitor enter `s` and press ENTER:
 
@@ -91,9 +101,9 @@ In the Serial Monitor enter `s` and press ENTER:
 r--V fffd c0
 ```
 
-The 6502 is `r`eading from hex address `$fffd` the value `$c0`. The 6502 is accessing a `V`ector location.
+The 6502 is `r`eading from hex address `$fffd` the value `$c0` and is accessing a `V`ector location (RESET).
 
-We are seeing the 6502 reset sequence. After a reset the 6502 expects to find the start of the program at location `$fffc`. Because this is a 16-bit address this is stored in locations `$fffc` and `$fffd`. The 6502 read the values `$00` and `$c0` which together comprise the address `$c000` (in little-endian format). This is where our program starts.
+What we are seeing is the 6502 reset sequence. After a reset the 6502 expects to find the start of the program at location `$fffc`. Because this is a 16-bit address this is stored in locations `$fffc` and `$fffd`. The 6502 read the values `$00` and `$c0` which together comprise the address `$c000` (in little-endian format). This is where our program starts.
 
 Enter `s` again and press ENTER:
 
@@ -172,29 +182,29 @@ void loop()
     uint8_t data;
     uint8_t octl;
 
-    cli();                              // 1. Disable interrupts
+    cli();                              // (1) Disable Arduino interrupts
 
     for (;;)
     {
-        clock_rise();                   // 2. Clock goes high
+        clock_rise();                   // (2) Clock goes high
 
-        octl = read_octl();             // 3. Read 6502 output control pins
-        addr = read_abus();             // 4. Read address from 6502 address bus
-        if (octl & P6502_OCTL_PIN(RWB)) // 5. Test the RWB pin
-        {
-            data = read_data(addr);     // 6. Read data from simulated ROM, RAM or MMIO
-            write_dbus(data);           // 7. Write data to data bus
+        octl = read_octl();             // (3) Read 6502 output control pins
+        addr = read_abus();             // (4) Read address from 6502 address bus
+        if (octl & P6502_OCTL_PIN(RWB)) // (5) Test the RWB pin
+        {                               // (5T) If RWB pin is high the 6502 is reading
+            data = read_data(addr);     // (5T.1) Read data from simulated ROM, RAM or MMIO
+            write_dbus(data);           // (5T.2) Write data to data bus
         }
         else
-        {
-            data = read_dbus();         // 8. Read data from data bus
-            write_data(addr, data);     // 9. Write data to simulated ROM, RAM or MMIO
+        {                               // (5F) If RWB pin is low the 6502 is writing
+            data = read_dbus();         // (5F.1) Read data from data bus
+            write_data(addr, data);     // (5F.2) Write data to simulated ROM, RAM or MMIO
         }
 
-        clock_fall();                   // 10. Clock goes low
+        clock_fall();                   // (6) Clock goes low
 
-        if (debug_available())          // 11. Fast check if debugger is active
-            debug(addr, data, octl);    // 12. Debugger implementation
+        if (debug_available())          // (7) Fast check if debugger is active
+            debug(addr, data, octl);    // (7T.1) Debugger implementation
     }
 }
 ```
@@ -203,12 +213,11 @@ A few things to note:
 
 - Arduino interrupts are disabled in order to maximize performance in the core loop. Arduino interrupts are enabled only for serial communications and the debugger.
 - All communication with the 6502 happens while the clock is high.
-- Communication with the 6502 does not happen via Arduino's `digitalRead` / `digitalWrite`, because this would make the loop very slow. Instead the ATmega2560 ports are accessed directly. For example to read from the address bus we do:
+- Communication with the 6502 does not happen via Arduino's `digitalRead` / `digitalWrite`, because this would make the loop very slow. Instead the ATmega 2560 ports are accessed directly. For example to read from the address bus we read ports F and K directly (some detail removed):
     ```C
     static inline uint16_t read_abus()
     {
-        /* read ATmega ports designated for 6502 address bus (ABLO, ABHI) */
-        return P6502_ABLO(PIN) | (P6502_ABHI(PIN) << 8);
+        return PINF | (PINK << 8);
     }
     ```
 -  We want maximum performance when the debugger is not active, but we also want to be able to break execution into the debugger. Recall that we have Arduino interrupts disabled and we therefore need another method to check if there is any user input. For this purpose we perform a quick check using the `debug_available` function, which returns `true` when the debugger is active or there is user input:
@@ -252,6 +261,8 @@ python 6502asm.py hello.asm -o 6502rom.h
 ```
 
 Will assemble the file `hello.asm` and produce the file `6502rom.h`.
+
+**NOTE**: The assembler is a work in progress and has not been tested fully. It currently assembles the file hello.asm correctly, but it may contain bugs or may be missing features vital for larger programs.
 
 ## Simulated architecture
 
