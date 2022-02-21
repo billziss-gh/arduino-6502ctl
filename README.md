@@ -41,6 +41,8 @@ Refer to the [W65C02S](https://www.westerndesigncenter.com/wdc/documentation/w65
 - Power: connect W65C02S VCC to Arduino 5V and W65C02S VDD to Arduino GND.
 - NC Pin: DO NOT connect the W65C02S NC pin.
 
+![6502ctl Fritzing](6502ctl.fzz.png)
+
 ## Software
 
 This software consists of the following components:
